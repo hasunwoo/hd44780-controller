@@ -1,0 +1,54 @@
+[package]
+name = "hd44780-controller"
+version = "0.1.0-alpha.0"
+edition = "2021"
+authors = ["hasunwoo <hasun@hasundev.com>"]
+license = "MIT"
+description = "HD44780 LCD controller with async/sync support for embedded-hal"
+readme = "README.md"
+repository = "https://github.com/hasunwoo/hd44780-controller"
+documentation = "https://docs.rs/hd44780-controller"
+keywords = ["lcd", "hd44780", "embedded-hal", "embedded-hal-async", "async"]
+categories = ["embedded", "no-std", "hardware-support"]
+
+
+[features]
+default = []
+
+# Enable async support
+async = []
+
+# Enables formatting support using heapless::String
+fmt = ["heapless"]
+
+# Enable I2C expander device implementation
+i2c-expander-device = ["embedded-hal"]
+
+# Enable async I2C expander device implementation
+i2c-expander-device-async = ["async", "embedded-hal-async"]
+
+# Enable PCF8574 support 
+pcf8574-device = ["i2c-expander-device"]
+
+# Enable async PCF8574 support 
+pcf8574-device-async = ["async", "i2c-expander-device-async"]
+
+# Enable everything
+all = [
+    "async",
+    "fmt",
+    "i2c-expander-device",
+    "pcf8574-device",
+    "pcf8574-device-async"
+]
+
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+
+[dependencies]
+embedded-hal = { version = "1.0.0", optional = true }
+embedded-hal-async = { version = "1.0.0", optional = true }
+heapless = { version = "0.8.0", optional = true }
