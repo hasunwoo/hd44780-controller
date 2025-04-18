@@ -193,10 +193,10 @@ impl<D: AsyncDevice> Controller<D, Init> {
         args: core::fmt::Arguments<'_>,
         charset: &FallbackCharset<C, FALLBACK_CODE>,
     ) -> Result<(), super::Error> {
-        let mut buffer = BufferedWrite(heapless::String::<BUFFER_SIZE>::new());
+        let mut buffer = heapless::String::<BUFFER_SIZE>::new();
         // string formatting should be infallible
         let _ = core::fmt::write(&mut buffer, args);
-        self.write_str_with_charset(&buffer.0, charset).await
+        self.write_str_with_charset(&buffer, charset).await
     }
 
     #[cfg(feature = "fmt")]
@@ -216,19 +216,5 @@ impl<D: AsyncDevice> Controller<D, Init> {
 
     pub fn release(self) -> D {
         self.device
-    }
-}
-
-#[cfg(feature = "fmt")]
-#[cfg_attr(docsrs, doc(cfg(feature = "fmt")))]
-struct BufferedWrite<const N: usize>(heapless::String<N>);
-
-#[cfg(feature = "fmt")]
-#[cfg_attr(docsrs, doc(cfg(feature = "fmt")))]
-impl<const N: usize> core::fmt::Write for BufferedWrite<N> {
-    fn write_str(&mut self, s: &str) -> core::fmt::Result {
-        let _ = self.0.push_str(s);
-        // string formatting should be infallible
-        Ok(())
     }
 }
