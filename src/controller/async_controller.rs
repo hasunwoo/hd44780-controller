@@ -1,7 +1,7 @@
 use core::marker::PhantomData;
 
 use crate::{
-    charset::{Charset, FallbackCharset, MinimalCharset},
+    charset::{InfallibleCharset, MinimalCharset},
     command::{Commands, *},
     device::{AsyncDevice, CommandExtAsync},
 };
@@ -146,57 +146,115 @@ impl<D: AsyncDevice> Controller<D, Init> {
         Ok(self.device.execute_command_async(&WriteChar(code)).await?)
     }
 
-    pub async fn write_char_with_charset<C: Charset, const FALLBACK_CODE: u8>(
+    pub async fn write_raw_str(
         &mut self,
-        c: char,
-        charset: &FallbackCharset<C, FALLBACK_CODE>,
+        raw_code: impl Iterator<Item = u8>,
     ) -> Result<(), super::Error> {
-        self.write_raw_char(charset.char_to_code(c)).await
-    }
-
-    pub async fn write_char(&mut self, c: char) -> Result<(), super::Error> {
-        self.write_char_with_charset(c, &MinimalCharset::BLANK_FALLBACK)
-            .await
-    }
-
-    pub async fn write_raw_str(&mut self, raw_code: &[u8]) -> Result<(), super::Error> {
-        for c in raw_code.iter().copied() {
+        for c in raw_code {
             self.write_raw_char(c).await?;
         }
         Ok(())
     }
 
-    pub async fn write_str_with_charset<C: Charset, const FALLBACK_CODE: u8>(
+    pub async fn write_raw_line(
         &mut self,
-        s: &str,
-        charset: &FallbackCharset<C, FALLBACK_CODE>,
+        row: u8,
+        raw_code: impl Iterator<Item = u8>,
     ) -> Result<(), super::Error> {
-        for c in s.chars() {
-            self.write_char_with_charset(c, charset).await?;
+        self.set_cursor_position(row, 0).await?;
+        for (_, c) in (0..40).zip(raw_code.chain(core::iter::repeat(b' '))) {
+            self.write_raw_char(c).await?;
         }
         Ok(())
     }
 
-    pub async fn write_str(&mut self, s: &str) -> Result<(), super::Error> {
-        self.write_str_with_charset(s, &MinimalCharset::BLANK_FALLBACK)
+    pub async fn write_char_with_charset<C: InfallibleCharset>(
+        &mut self,
+        c: char,
+        charset: C,
+    ) -> Result<(), super::Error> {
+        self.write_raw_char(charset.char_to_code(c)).await
+    }
+
+    pub async fn write_str_with_charset<C: InfallibleCharset>(
+        &mut self,
+        s: impl Iterator<Item = char>,
+        charset: C,
+    ) -> Result<(), super::Error> {
+        self.write_raw_str(s.map(|c| charset.char_to_code(c))).await
+    }
+
+    pub async fn write_line_with_charset<C: InfallibleCharset>(
+        &mut self,
+        row: u8,
+        s: impl Iterator<Item = char>,
+        charset: C,
+    ) -> Result<(), super::Error> {
+        self.set_cursor_position(row, 0).await?;
+        self.write_raw_line(row, s.map(|c| charset.char_to_code(c)))
+            .await
+    }
+
+    pub async fn write_char(&mut self, c: char) -> Result<(), super::Error> {
+        self.write_char_with_charset(c, MinimalCharset::BLANK_FALLBACK)
+            .await
+    }
+
+    pub async fn write_str(&mut self, s: impl Iterator<Item = char>) -> Result<(), super::Error> {
+        self.write_str_with_charset(s, MinimalCharset::BLANK_FALLBACK)
+            .await
+    }
+
+    pub async fn write_line(
+        &mut self,
+        row: u8,
+        s: impl Iterator<Item = char>,
+    ) -> Result<(), super::Error> {
+        self.write_line_with_charset(row, s, MinimalCharset::BLANK_FALLBACK)
             .await
     }
 
     #[cfg(feature = "fmt")]
     #[cfg_attr(docsrs, doc(cfg(feature = "fmt")))]
-    pub async fn write_fmt_with_charset<
-        C: Charset,
-        const FALLBACK_CODE: u8,
-        const BUFFER_SIZE: usize,
-    >(
+    pub async fn write_line_fmt_with_charset<C: InfallibleCharset, const BUFFER_SIZE: usize>(
         &mut self,
+        row: u8,
         args: core::fmt::Arguments<'_>,
-        charset: &FallbackCharset<C, FALLBACK_CODE>,
+        charset: C,
     ) -> Result<(), super::Error> {
         let mut buffer = heapless::String::<BUFFER_SIZE>::new();
         // string formatting should be infallible
         let _ = core::fmt::write(&mut buffer, args);
-        self.write_str_with_charset(&buffer, charset).await
+        self.write_line_with_charset(row, buffer.chars(), charset)
+            .await
+    }
+
+    #[cfg(feature = "fmt")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "fmt")))]
+    pub async fn write_line_fmt<const BUFFER_SIZE: usize>(
+        &mut self,
+        row: u8,
+        args: core::fmt::Arguments<'_>,
+    ) -> Result<(), super::Error> {
+        self.write_line_fmt_with_charset::<_, BUFFER_SIZE>(
+            row,
+            args,
+            MinimalCharset::BLANK_FALLBACK,
+        )
+        .await
+    }
+
+    #[cfg(feature = "fmt")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "fmt")))]
+    pub async fn write_fmt_with_charset<C: InfallibleCharset, const BUFFER_SIZE: usize>(
+        &mut self,
+        args: core::fmt::Arguments<'_>,
+        charset: C,
+    ) -> Result<(), super::Error> {
+        let mut buffer = heapless::String::<BUFFER_SIZE>::new();
+        // string formatting should be infallible
+        let _ = core::fmt::write(&mut buffer, args);
+        self.write_str_with_charset(buffer.chars(), charset).await
     }
 
     #[cfg(feature = "fmt")]
@@ -206,7 +264,7 @@ impl<D: AsyncDevice> Controller<D, Init> {
         args: core::fmt::Arguments<'_>,
     ) -> Result<(), super::Error> {
         // placeholders for const generic is not yet supported.
-        self.write_fmt_with_charset::<_, b' ', BUFFER_SIZE>(args, &MinimalCharset::BLANK_FALLBACK)
+        self.write_fmt_with_charset::<_, BUFFER_SIZE>(args, MinimalCharset::BLANK_FALLBACK)
             .await
     }
 

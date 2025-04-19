@@ -63,8 +63,25 @@ impl<D> Controller<D, state::Empty> {
 #[cfg(feature = "fmt")]
 #[cfg_attr(docsrs, doc(cfg(feature = "fmt")))]
 #[macro_export]
-macro_rules! lcd_print {
+macro_rules! lcd_write {
     ($lcd:expr, $($arg:tt)*) => {
         $lcd.write_fmt::<128>(format_args!($($arg)*))
+    };
+
+    ($lcd:expr, charset = $charset:expr, $($arg:tt)*) => {
+        $lcd.write_fmt_with_charset::<128>(format_args!($($arg)*), $charset)
+    };
+}
+
+#[cfg(feature = "fmt")]
+#[cfg_attr(docsrs, doc(cfg(feature = "fmt")))]
+#[macro_export]
+macro_rules! lcd_println {
+    ($lcd:expr, line = $line:expr, $($arg:tt)*) => {
+        $lcd.write_line_fmt::<128>($line, format_args!($($arg)*))
+    };
+
+    ($lcd:expr, line = $line:expr, charset = $charset:expr, $($arg:tt)*) => {
+        $lcd.write_line_fmt_with_charset::<128>(format_args!($($arg)*), $charset)
     };
 }

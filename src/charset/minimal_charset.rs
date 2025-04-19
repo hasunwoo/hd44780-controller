@@ -1,11 +1,11 @@
-use super::{BlankFallback, Charset, FallbackCharset, QuestionFallback};
+use super::{BlankFallback, Charset, QuestionFallback};
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub struct MinimalCharset;
 
 impl MinimalCharset {
-    pub const BLANK_FALLBACK: BlankFallback<Self> = FallbackCharset(Self);
-    pub const QUESTION_FALLBACK: QuestionFallback<Self> = FallbackCharset(Self);
+    pub const BLANK_FALLBACK: BlankFallback<Self> = BlankFallback(Self);
+    pub const QUESTION_FALLBACK: QuestionFallback<Self> = QuestionFallback(Self);
 }
 
 impl Charset for MinimalCharset {
